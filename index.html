@@ -193,8 +193,8 @@
     </div>
 
     <div id="controls">
-      <button class="ctrl-btn active" id="btn-chloro">Chl-a (productivity)</button>
-      <button class="ctrl-btn active" id="btn-labels">Feature labels</button>
+      <button class="ctrl-btn active" id="btn-chloro"><span id="chloro-st">⋯</span> Chl-a (productivity)</button>
+      <button class="ctrl-btn active" id="btn-labels"><span id="ref-st">⋯</span> Feature labels</button>
     </div>
 
     <div id="loading">Loading ocean tiles…</div>
@@ -219,7 +219,7 @@
     </div>
     <div class="legend-item">
       <div class="legend-swatch" style="background:rgba(20,200,80,0.65); border:1px solid rgba(40,220,100,0.4)"></div>
-      <span>Chlorophyll-a (MODIS, Sep 2023)</span>
+      <span>Chlorophyll-a (MODIS Aqua, Jun 2020)</span>
     </div>
     <div class="legend-item">
       <div class="legend-swatch" style="background:#6b7c5a; border:1px solid #8a9a70"></div>
@@ -233,8 +233,8 @@
 
     // ── Map ──────────────────────────────────────────────────────────
     const map = L.map('map', {
-      center: [20, -20],
-      zoom: 3,
+      center: [45, -30],   // North Atlantic — high-productivity spring bloom region
+      zoom: 4,
       minZoom: 2,
       maxZoom: 12,
       worldCopyJump: true,
@@ -252,12 +252,31 @@
       { opacity: 0.85, maxZoom: 13, attribution: '' }
     ).addTo(map);
 
-    // NASA GIBS — MODIS Aqua Chlorophyll-a monthly composite (real satellite data)
-    // September 2023: peak Northern Hemisphere productivity season
-    const chloroLayer = L.tileLayer(
-      'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Aqua_Chlorophyll_A/default/2023-09-01/GoogleMapsCompatible_Level7/{z}/{y}/{x}.png',
-      { opacity: 0.55, maxZoom: 7, attribution: 'NASA EOSDIS GIBS / MODIS Aqua' }
+    // NASA GIBS — MODIS Aqua Chlorophyll-a (real satellite data, June 2020)
+    // Using WMS which auto-constructs correct tile requests without needing to know
+    // the exact WMTS tile matrix set name.
+    // June 2020: Northern Hemisphere spring/summer bloom, MODIS Aqua fully operational.
+    const chloroLayer = L.tileLayer.wms(
+      'https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi',
+      {
+        layers: 'MODIS_Aqua_Chlorophyll_A',
+        format: 'image/png',
+        transparent: true,
+        opacity: 0.65,
+        time: '2020-06-01',
+        attribution: 'NASA EOSDIS GIBS / MODIS Aqua Chl-a',
+        crossOrigin: true,
+      }
     ).addTo(map);
+
+    // ── Layer status indicators ──────────────────────────────────────
+    const chloroSt = document.getElementById('chloro-st');
+    const refSt    = document.getElementById('ref-st');
+
+    chloroLayer.on('load',      () => { chloroSt.textContent = '●'; });
+    chloroLayer.on('tileerror', () => { chloroSt.textContent = '✕'; });
+    refLayer.on('load',         () => { refSt.textContent = '●'; });
+    refLayer.on('tileerror',    () => { refSt.textContent = '✕'; });
 
     // ── Loading overlay ──────────────────────────────────────────────
     const loadingEl = document.getElementById('loading');
