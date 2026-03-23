@@ -1,0 +1,8 @@
+{
+  "name": "seafloor-visualization",
+  "version": "1.0.0",
+  "description": "Interactive seafloor geomorphology, bathymetry, and primary productivity visualization",
+  "dependencies": {
+    "@visquill/visquill-gdk": "alpha"
+  }
+}
