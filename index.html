@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seafloor: Geomorphology · Bathymetry · Primary Productivity</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -35,158 +36,102 @@
       font-style: italic;
     }
 
-    #viz-wrapper {
+    #map-wrapper {
       width: 900px;
       height: 520px;
       position: relative;
       border: 1px solid #0f2a3e;
       border-radius: 3px;
       overflow: hidden;
-      background: #050a14;
       box-shadow: 0 0 40px rgba(0,30,60,0.8);
     }
 
-    #viz {
-      width: 100%;
-      height: 100%;
-    }
+    #map { width: 100%; height: 100%; }
 
-    /* ─── Zone bands (bg layer, prefix sf-bg-) ─── */
-    .sf-bg-sky { fill: #04090f; stroke: none; }
-    .sf-bg-sunlit  { fill: rgba(60, 155, 200, 0.22); stroke: none; }
-    .sf-bg-twilight { fill: rgba(15, 70, 150, 0.28); stroke: none; }
-    .sf-bg-midnight { fill: rgba(8, 25, 85, 0.38); stroke: none; }
-    .sf-bg-abyssal  { fill: rgba(3, 8, 28, 0.50); stroke: none; }
-    .sf-bg-surface-line { stroke: rgba(80, 180, 220, 0.35); stroke-width: 1; fill: none; }
-
-    /* ─── Zone dividers (bg layer) ─── */
-    .sf-bg-zone-div { stroke: rgba(40, 100, 160, 0.2); stroke-width: 1; stroke-dasharray: 3,4; fill: none; }
-
-    /* ─── Primary productivity (prod layer, sf-prod-) ─── */
-    .sf-prod-zone { fill: rgba(30, 160, 75, 0.13); stroke: none; }
-    .sf-prod-bloom {
-      fill: rgba(45, 200, 90, 0.40);
-      stroke: rgba(80, 230, 120, 0.25);
-      stroke-width: 1;
-    }
-    .sf-prod-bloom-mid {
-      fill: rgba(45, 200, 90, 0.22);
-      stroke: rgba(80, 230, 120, 0.15);
-      stroke-width: 1;
-    }
-
-    /* ─── Geomorphology (geo layer, sf-geo-) ─── */
-    .sf-geo-seafloor {
-      fill: #2e2518;
-      stroke: #6a5a42;
-      stroke-width: 1.2;
-    }
-    .sf-geo-contour {
-      fill: none;
-      stroke: rgba(120, 100, 70, 0.35);
-      stroke-width: 0.8;
-      stroke-dasharray: 5,6;
-    }
-    .sf-geo-ridge-highlight {
-      fill: none;
-      stroke: rgba(160, 130, 90, 0.5);
-      stroke-width: 1.5;
-    }
-    .sf-geo-land {
-      fill: #3a3020;
-      stroke: #8a7550;
-      stroke-width: 1;
-    }
-
-    /* ─── Labels (lbl layer, sf-lbl-) ─── */
-    .sf-lbl-zone {
-      fill: rgba(140, 195, 225, 0.65);
-      font-size: 9.5px;
+    /* ── Probe panel ── */
+    #probe {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(5, 12, 28, 0.92);
+      border: 1px solid rgba(60, 120, 170, 0.55);
+      border-radius: 3px;
+      padding: 10px 14px;
       font-family: 'Courier New', monospace;
-      letter-spacing: 0.12em;
-    }
-    .sf-lbl-feature {
-      fill: rgba(215, 195, 155, 0.85);
       font-size: 11px;
-      font-family: 'Georgia', serif;
+      color: rgba(140, 195, 225, 0.9);
+      pointer-events: none;
+      z-index: 1000;
+      min-width: 196px;
+    }
+    .probe-title {
+      color: rgba(120, 185, 220, 0.9);
+      font-size: 8.5px;
+      letter-spacing: 0.1em;
+      margin-bottom: 7px;
+    }
+    .probe-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 3px;
+    }
+    .pk { color: rgba(140, 170, 195, 0.75); }
+    .pv { color: rgba(255, 215, 80, 0.95); font-weight: bold; }
+    .pv-zone { color: rgba(100, 210, 240, 0.9); font-weight: bold; }
+    #probe-note {
+      margin-top: 7px;
+      font-size: 8px;
+      color: rgba(100, 150, 180, 0.6);
       font-style: italic;
     }
-    .sf-lbl-depth {
-      fill: rgba(100, 170, 210, 0.7);
-      font-size: 8.5px;
-      font-family: 'Courier New', monospace;
+
+    /* ── Layer controls ── */
+    #controls {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      z-index: 1000;
+      display: flex;
+      gap: 6px;
     }
-    .sf-lbl-ruler-tick { stroke: rgba(80, 140, 180, 0.4); stroke-width: 1; fill: none; }
-    .sf-lbl-ruler-line { stroke: rgba(80, 140, 180, 0.3); stroke-width: 1; fill: none; }
-    .sf-lbl-arrow {
-      fill: none;
-      stroke: rgba(160, 190, 210, 0.45);
-      stroke-width: 0.8;
+    .ctrl-btn {
+      background: rgba(5, 12, 28, 0.88);
+      border: 1px solid rgba(60, 120, 170, 0.4);
+      color: rgba(140, 195, 225, 0.8);
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      letter-spacing: 0.04em;
+      padding: 5px 10px;
+      cursor: pointer;
+      border-radius: 2px;
+      user-select: none;
+    }
+    .ctrl-btn:hover { border-color: rgba(60, 120, 170, 0.8); color: #c8dce8; }
+    .ctrl-btn.active {
+      background: rgba(15, 40, 70, 0.88);
+      border-color: rgba(60, 180, 220, 0.7);
+      color: rgba(100, 210, 240, 0.9);
     }
 
-    /* ─── Interactive probe (i layer, sf-i-) ─── */
-    .sf-i-probe-line {
-      stroke: rgba(255, 210, 60, 0.55);
-      stroke-width: 1.5;
-      stroke-dasharray: 5,4;
-      fill: none;
-    }
-    .sf-i-probe-floor {
-      fill: rgba(255, 210, 60, 0.7);
-      stroke: rgba(255, 240, 130, 0.6);
-      stroke-width: 1.5;
-    }
-    .sf-i-probe-surface {
-      fill: rgba(255, 210, 60, 0.95);
-      stroke: rgba(255, 235, 160, 0.85);
-      stroke-width: 2;
-      cursor: ew-resize;
-    }
-    .sf-i-info-bg {
-      fill: rgba(5, 12, 28, 0.88);
-      stroke: rgba(60, 120, 170, 0.55);
-      stroke-width: 1;
-    }
-    .sf-i-info-title {
-      fill: rgba(120, 185, 220, 0.9);
-      font-size: 8.5px;
+    /* ── Loading overlay ── */
+    #loading {
+      position: absolute;
+      inset: 0;
+      background: rgba(5, 12, 28, 0.88);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(120, 185, 220, 0.85);
       font-family: 'Courier New', monospace;
-      letter-spacing: 0.1em;
-    }
-    .sf-i-info-key {
-      fill: rgba(140, 170, 195, 0.75);
-      font-size: 9px;
-      font-family: 'Courier New', monospace;
-    }
-    .sf-i-info-val {
-      fill: rgba(255, 215, 80, 0.95);
-      font-size: 9px;
-      font-family: 'Courier New', monospace;
-      font-weight: bold;
-    }
-    .sf-i-info-val-zone {
-      fill: rgba(100, 210, 240, 0.9);
-      font-size: 9px;
-      font-family: 'Courier New', monospace;
-      font-weight: bold;
-    }
-    .sf-i-info-val-prod {
-      fill: rgba(80, 215, 120, 0.9);
-      font-size: 9px;
-      font-family: 'Courier New', monospace;
-      font-weight: bold;
-    }
-    .sf-i-prod-bar-bg {
-      fill: rgba(20, 50, 30, 0.7);
-      stroke: rgba(40, 120, 60, 0.4);
-      stroke-width: 1;
-    }
-    .sf-i-prod-bar {
-      fill: rgba(60, 210, 110, 0.8);
-      stroke: none;
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      z-index: 2000;
+      pointer-events: none;
+      transition: opacity 0.5s;
     }
 
-    /* ─── Legend ─── */
+    /* ── Legend ── */
     #legend {
       margin-top: 12px;
       display: flex;
@@ -200,496 +145,215 @@
       width: 900px;
       justify-content: center;
     }
-
     .legend-item {
       display: flex;
       align-items: center;
       gap: 7px;
       color: #90b0c0;
     }
-
     .legend-swatch {
       width: 18px;
       height: 10px;
       border-radius: 2px;
       flex-shrink: 0;
     }
+
+    /* ── Override Leaflet chrome to match dark theme ── */
+    .leaflet-control-attribution {
+      background: rgba(5, 12, 28, 0.80) !important;
+      color: rgba(100, 150, 190, 0.65) !important;
+      font-size: 9px !important;
+    }
+    .leaflet-control-attribution a { color: rgba(100, 180, 220, 0.75) !important; }
+    .leaflet-bar a {
+      background: rgba(5, 12, 28, 0.90) !important;
+      color: rgba(140, 195, 225, 0.9) !important;
+      border-color: rgba(60, 120, 170, 0.45) !important;
+    }
+    .leaflet-bar a:hover {
+      background: rgba(15, 40, 70, 0.90) !important;
+      color: #c8dce8 !important;
+    }
   </style>
 </head>
 <body>
   <h1>Seafloor: Geomorphology &middot; Bathymetry &middot; Primary Productivity</h1>
-  <p id="subtitle">Drag the handle ◈ along the surface to explore depth, zone, and biological productivity</p>
+  <p id="subtitle">Hover for coordinates · Click to probe depth &amp; zone · Scroll or pinch to zoom</p>
 
-  <div id="viz-wrapper">
-    <div id="viz"></div>
+  <div id="map-wrapper">
+    <div id="map"></div>
+
+    <div id="probe">
+      <div class="probe-title">◈ PROBE</div>
+      <div class="probe-row"><span class="pk">lat:</span><span class="pv" id="p-lat">—</span></div>
+      <div class="probe-row"><span class="pk">lon:</span><span class="pv" id="p-lon">—</span></div>
+      <div class="probe-row"><span class="pk">depth:</span><span class="pv" id="p-depth">—</span></div>
+      <div class="probe-row"><span class="pk">zone:</span><span class="pv-zone" id="p-zone">—</span></div>
+      <div id="probe-note">Click ocean to query ETOPO1</div>
+    </div>
+
+    <div id="controls">
+      <button class="ctrl-btn active" id="btn-chloro">Chl-a (productivity)</button>
+      <button class="ctrl-btn active" id="btn-labels">Feature labels</button>
+    </div>
+
+    <div id="loading">Loading ocean tiles…</div>
   </div>
 
   <div id="legend">
     <div class="legend-item">
-      <div class="legend-swatch" style="background:rgba(60,155,200,0.45)"></div>
-      <span>Sunlit zone (0–200 m)</span>
+      <div class="legend-swatch" style="background:#8fc8e0"></div>
+      <span>Shelf (0–200 m)</span>
     </div>
     <div class="legend-item">
-      <div class="legend-swatch" style="background:rgba(15,70,150,0.55)"></div>
-      <span>Twilight zone (200–1000 m)</span>
+      <div class="legend-swatch" style="background:#3a7fc0"></div>
+      <span>Mesopelagic (200–1000 m)</span>
     </div>
     <div class="legend-item">
-      <div class="legend-swatch" style="background:rgba(8,25,85,0.65)"></div>
-      <span>Midnight zone (1000–4000 m)</span>
+      <div class="legend-swatch" style="background:#1c4080"></div>
+      <span>Bathypelagic (1000–4000 m)</span>
     </div>
     <div class="legend-item">
-      <div class="legend-swatch" style="background:rgba(3,8,28,0.80)"></div>
-      <span>Abyssal zone (&gt;4000 m)</span>
+      <div class="legend-swatch" style="background:#0a1840"></div>
+      <span>Abyssal (> 4000 m)</span>
     </div>
     <div class="legend-item">
-      <div class="legend-swatch" style="background:rgba(45,200,90,0.55)"></div>
-      <span>Primary productivity</span>
+      <div class="legend-swatch" style="background:rgba(20,200,80,0.65); border:1px solid rgba(40,220,100,0.4)"></div>
+      <span>Chlorophyll-a (MODIS, Sep 2023)</span>
     </div>
     <div class="legend-item">
-      <div class="legend-swatch" style="background:#3a3020; border:1px solid #6a5a42"></div>
-      <span>Seafloor geomorphology</span>
+      <div class="legend-swatch" style="background:#6b7c5a; border:1px solid #8a9a70"></div>
+      <span>Land</span>
     </div>
   </div>
 
-  <script src="./visquill.umd.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
   (function () {
-    const { VisQuill, Reactive, Attach, Animate } = window.VisQuill;
 
-    // ── Canvas dimensions ───────────────────────────────────────────
-    const W = 900, H = 520;
-    const Y_SURFACE = 52;    // ocean surface y
-    const Y_MAX     = 462;   // deepest floor y (abyssal plain)
+    // ── Map ──────────────────────────────────────────────────────────
+    const map = L.map('map', {
+      center: [20, -20],
+      zoom: 3,
+      minZoom: 2,
+      maxZoom: 12,
+      worldCopyJump: true,
+    });
 
-    // ── Depth scale: artistic, non-linear
-    // Zone boundaries (in pixels from Y_SURFACE):
-    const ZONE = {
-      sunlit:    { top: 0,   bot: 80,  label: 'SUNLIT ZONE',    depth: '0 – 200 m',  maxDepth: 200   },
-      twilight:  { top: 80,  bot: 200, label: 'TWILIGHT ZONE',  depth: '200 – 1000 m', maxDepth: 1000 },
-      midnight:  { top: 200, bot: 340, label: 'MIDNIGHT ZONE',  depth: '1000 – 4000 m', maxDepth: 4000 },
-      abyssal:   { top: 340, bot: 420, label: 'ABYSSAL ZONE',   depth: '> 4000 m',   maxDepth: 6000  },
-    };
+    // ESRI World Ocean Base — rendered from GEBCO + ETOPO bathymetry data
+    const baseLayer = L.tileLayer(
+      'https://services.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}',
+      { attribution: 'Tiles © Esri — GEBCO, NOAA, National Geographic, DeLorme', maxZoom: 13 }
+    ).addTo(map);
 
-    // Convert zone-relative pixel offset → approximate depth in metres
-    function pixelToDepth(pixY) {
-      const dy = pixY - Y_SURFACE;
-      if (dy <= 0) return 0;
-      if (dy <= ZONE.sunlit.bot)   return dy / ZONE.sunlit.bot * 200;
-      if (dy <= ZONE.twilight.bot) return 200 + (dy - ZONE.sunlit.bot) / (ZONE.twilight.bot - ZONE.sunlit.bot) * 800;
-      if (dy <= ZONE.midnight.bot) return 1000 + (dy - ZONE.twilight.bot) / (ZONE.midnight.bot - ZONE.twilight.bot) * 3000;
-      return 4000 + (dy - ZONE.midnight.bot) / (ZONE.abyssal.bot - ZONE.midnight.bot) * 2000;
-    }
+    // ESRI World Ocean Reference — ridge names, trench labels, basin names
+    const refLayer = L.tileLayer(
+      'https://services.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}',
+      { opacity: 0.85, maxZoom: 13, attribution: '' }
+    ).addTo(map);
 
-    function depthToPixel(depth) {
-      if (depth <= 0)    return Y_SURFACE;
-      if (depth <= 200)  return Y_SURFACE + depth / 200 * ZONE.sunlit.bot;
-      if (depth <= 1000) return Y_SURFACE + ZONE.sunlit.bot + (depth - 200) / 800 * (ZONE.twilight.bot - ZONE.sunlit.bot);
-      if (depth <= 4000) return Y_SURFACE + ZONE.twilight.bot + (depth - 1000) / 3000 * (ZONE.midnight.bot - ZONE.twilight.bot);
-      return Y_SURFACE + ZONE.midnight.bot + (depth - 4000) / 2000 * (ZONE.abyssal.bot - ZONE.midnight.bot);
-    }
+    // NASA GIBS — MODIS Aqua Chlorophyll-a monthly composite (real satellite data)
+    // September 2023: peak Northern Hemisphere productivity season
+    const chloroLayer = L.tileLayer(
+      'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Aqua_Chlorophyll_A/default/2023-09-01/GoogleMapsCompatible_Level7/{z}/{y}/{x}.png',
+      { opacity: 0.55, maxZoom: 7, attribution: 'NASA EOSDIS GIBS / MODIS Aqua' }
+    ).addTo(map);
 
-    function zoneOf(depth) {
-      if (depth < 200)  return 'Sunlit';
-      if (depth < 1000) return 'Twilight';
-      if (depth < 4000) return 'Midnight';
-      return 'Abyssal';
-    }
+    // ── Loading overlay ──────────────────────────────────────────────
+    const loadingEl = document.getElementById('loading');
+    baseLayer.once('load', () => {
+      loadingEl.style.opacity = '0';
+      setTimeout(() => loadingEl.style.display = 'none', 500);
+    });
+    // Fallback: always remove after 6 s
+    setTimeout(() => { loadingEl.style.opacity = '0'; loadingEl.style.display = 'none'; }, 6000);
 
-    // ── Seafloor profile (x, depth in metres) ─────────────────────
-    // The profile defines the seafloor depth at each x coordinate.
-    const PROFILE = [
-      // coast / land
-      { x: 0,   d: 0   },
-      { x: 15,  d: 40  },
-      { x: 50,  d: 90  },
-      // continental shelf — gently dipping
-      { x: 100, d: 120 },
-      { x: 150, d: 145 },
-      { x: 180, d: 165 },
-      { x: 205, d: 190 },
-      // shelf break / continental slope — steep
-      { x: 225, d: 350 },
-      { x: 255, d: 700 },
-      { x: 285, d: 1200 },
-      // continental rise
-      { x: 320, d: 1900 },
-      { x: 360, d: 2700 },
-      // abyssal plain
-      { x: 395, d: 3900 },
-      { x: 430, d: 4420 },
-      { x: 470, d: 4530 },
-      { x: 490, d: 4550 },
-      { x: 510, d: 4545 },
-      // seamount — rises sharply
-      { x: 525, d: 4300 },
-      { x: 545, d: 3600 },
-      { x: 565, d: 2800 },
-      { x: 580, d: 2100 },
-      { x: 595, d: 1450 },
-      { x: 610, d: 1050 },  // seamount peak
-      { x: 622, d: 1350 },
-      { x: 640, d: 2000 },
-      { x: 660, d: 3000 },
-      { x: 680, d: 3900 },
-      { x: 700, d: 4480 },
-      { x: 720, d: 4530 },
-      // mid-ocean ridge — broader, prominent
-      { x: 735, d: 4200 },
-      { x: 755, d: 3500 },
-      { x: 775, d: 2600 },
-      { x: 795, d: 1800 },
-      { x: 815, d: 1300 },
-      { x: 830, d: 1050 },  // ridge peak
-      { x: 845, d: 1300 },
-      { x: 865, d: 1900 },
-      { x: 885, d: 2700 },
-      { x: 900, d: 3400 },
-    ];
+    // ── Layer toggles ────────────────────────────────────────────────
+    let chloroOn = true, refOn = true;
 
-    function getFloorY(x) {
-      const x0 = Math.max(0, Math.min(W, x));
-      for (let i = 0; i < PROFILE.length - 1; i++) {
-        const a = PROFILE[i], b = PROFILE[i + 1];
-        if (x0 >= a.x && x0 <= b.x) {
-          const t = (x0 - a.x) / (b.x - a.x);
-          const depth = a.d + t * (b.d - a.d);
-          return depthToPixel(depth);
+    document.getElementById('btn-chloro').addEventListener('click', () => {
+      chloroOn = !chloroOn;
+      chloroOn ? map.addLayer(chloroLayer) : map.removeLayer(chloroLayer);
+      document.getElementById('btn-chloro').classList.toggle('active', chloroOn);
+    });
+
+    document.getElementById('btn-labels').addEventListener('click', () => {
+      refOn = !refOn;
+      refOn ? map.addLayer(refLayer) : map.removeLayer(refLayer);
+      document.getElementById('btn-labels').classList.toggle('active', refOn);
+    });
+
+    // ── Probe: coordinates on hover ──────────────────────────────────
+    const pLat   = document.getElementById('p-lat');
+    const pLon   = document.getElementById('p-lon');
+    const pDepth = document.getElementById('p-depth');
+    const pZone  = document.getElementById('p-zone');
+    const pNote  = document.getElementById('probe-note');
+
+    map.on('mousemove', (e) => {
+      const { lat, lng } = e.latlng;
+      pLat.textContent = `${Math.abs(lat).toFixed(3)}°\u2009${lat >= 0 ? 'N' : 'S'}`;
+      pLon.textContent = `${Math.abs(lng).toFixed(3)}°\u2009${lng >= 0 ? 'E' : 'W'}`;
+    });
+
+    // ── Probe: depth on click via ETOPO1 API ─────────────────────────
+    let marker = null;
+
+    map.on('click', async (e) => {
+      const { lat, lng } = e.latlng;
+
+      // Place/move marker
+      if (marker) marker.setLatLng(e.latlng);
+      else marker = L.circleMarker(e.latlng, {
+        radius: 5,
+        color: 'rgba(255,210,60,0.9)',
+        fillColor: 'rgba(255,210,60,0.7)',
+        fillOpacity: 1,
+        weight: 2,
+      }).addTo(map);
+
+      pDepth.textContent = '…';
+      pZone.textContent  = '…';
+      pNote.textContent  = 'Querying ETOPO1…';
+
+      try {
+        const res  = await fetch(
+          `https://api.opentopodata.org/v1/etopo1?locations=${lat.toFixed(4)},${lng.toFixed(4)}`
+        );
+        const json = await res.json();
+        const elev = json.results[0].elevation;
+
+        if (elev === null) {
+          pDepth.textContent = 'No data';
+          pZone.textContent  = '—';
+          pNote.textContent  = '';
+          return;
         }
-      }
-      return depthToPixel(PROFILE[PROFILE.length - 1].d);
-    }
 
-    function getFloorDepth(x) {
-      const x0 = Math.max(0, Math.min(W, x));
-      for (let i = 0; i < PROFILE.length - 1; i++) {
-        const a = PROFILE[i], b = PROFILE[i + 1];
-        if (x0 >= a.x && x0 <= b.x) {
-          const t = (x0 - a.x) / (b.x - a.x);
-          return Math.round(a.d + t * (b.d - a.d));
+        if (elev >= 0) {
+          pDepth.textContent = `${Math.round(elev).toLocaleString()} m (land)`;
+          pZone.textContent  = 'Land / coastal';
+        } else {
+          const depth = -elev;
+          pDepth.textContent = `${Math.round(depth).toLocaleString()} m`;
+          pZone.textContent  = zone(depth);
         }
+        pNote.textContent = 'Source: ETOPO1 (NOAA/NCEI)';
+
+      } catch {
+        pDepth.textContent = 'API unavailable';
+        pZone.textContent  = '—';
+        pNote.textContent  = 'Try again or check connection';
       }
-      return PROFILE[PROFILE.length - 1].d;
+    });
+
+    function zone(depth) {
+      if (depth <  200) return 'Sunlit — Epipelagic';
+      if (depth < 1000) return 'Twilight — Mesopelagic';
+      if (depth < 4000) return 'Midnight — Bathypelagic';
+      if (depth < 6000) return 'Abyssal — Abyssopelagic';
+      return 'Hadal — Hadalpelagic';
     }
-
-    // ── Primary productivity (0–1 scale, 0 below photic zone) ──────
-    function getProductivity(x, depth) {
-      if (depth >= 200) return 0;
-      const photicFraction = 1 - depth / 200;
-      // Coastal / shelf bloom (nutrient upwelling)
-      const shelfBloom  = x < 250 ? 0.88 : 0;
-      // Seamount upwelling zone
-      const mountBloom  = (x > 545 && x < 670) ? 0.55 : 0;
-      // Ridge upwelling
-      const ridgeBloom  = (x > 760 && x < 875) ? 0.42 : 0;
-      // Open ocean background
-      const background  = 0.18;
-      const surfaceMax  = Math.max(shelfBloom, mountBloom, ridgeBloom, background);
-      return surfaceMax * photicFraction;
-    }
-
-    // ── Build seafloor polygon vertices ────────────────────────────
-    function buildSeafloorPoly() {
-      const pts = [];
-      for (const p of PROFILE) {
-        pts.push({ x: p.x, y: depthToPixel(p.d) });
-      }
-      // Close along bottom and back
-      pts.push({ x: W, y: H });
-      pts.push({ x: 0, y: H });
-      return pts;
-    }
-
-    // ── Build productivity polygon (intersection of seafloor profile
-    //    and sunlit zone, used for the green photic overlay) ─────────
-    function buildProdPoly() {
-      const yPhotic = Y_SURFACE + ZONE.sunlit.bot; // = Y_SURFACE + 80
-      const pts = [];
-      // Walk along surface
-      pts.push({ x: 0, y: Y_SURFACE });
-      pts.push({ x: W, y: Y_SURFACE });
-      // Walk back along floor clamped to photic zone
-      const profileRight = PROFILE.slice().reverse();
-      for (const p of profileRight) {
-        const floorY = depthToPixel(p.d);
-        pts.push({ x: p.x, y: Math.min(floorY, yPhotic) });
-      }
-      return pts;
-    }
-
-    // ── Build contour line at a given depth ────────────────────────
-    function buildContourLine(targetDepth) {
-      const pts = [];
-      for (let x = 0; x <= W; x += 4) {
-        const depth = getFloorDepth(x);
-        if (Math.abs(depth - targetDepth) < targetDepth * 0.08) {
-          if (pts.length === 0 || x - pts[pts.length - 1].x > 8) {
-            pts.push({ x, y: depthToPixel(depth) - 3 });
-          }
-        }
-      }
-      return pts;
-    }
-
-    // ════════════════════════════════════════════════════════════════
-    // BUILD VISUALIZATION
-    // ════════════════════════════════════════════════════════════════
-    const container = document.getElementById('viz');
-    const rvg = VisQuill.create(container, 'sf-');
-    const canvas = rvg.canvas;
-
-    // ── Layer 0: background ─────────────────────────────────────────
-    const bgLayer = canvas.layer('bg-');
-
-    // Full dark background
-    bgLayer.visuals.box('sky', { x: 0, y: 0 }, { x: W, y: H });
-
-    // Zone bands
-    bgLayer.visuals.box('sunlit',   { x: 0, y: Y_SURFACE },                           { x: W, y: Y_SURFACE + ZONE.sunlit.bot });
-    bgLayer.visuals.box('twilight', { x: 0, y: Y_SURFACE + ZONE.sunlit.bot },          { x: W, y: Y_SURFACE + ZONE.twilight.bot });
-    bgLayer.visuals.box('midnight', { x: 0, y: Y_SURFACE + ZONE.twilight.bot },        { x: W, y: Y_SURFACE + ZONE.midnight.bot });
-    bgLayer.visuals.box('abyssal',  { x: 0, y: Y_SURFACE + ZONE.midnight.bot },        { x: W, y: Y_SURFACE + ZONE.abyssal.bot });
-
-    // Zone dividers
-    const zoneYs = [
-      Y_SURFACE + ZONE.sunlit.bot,
-      Y_SURFACE + ZONE.twilight.bot,
-      Y_SURFACE + ZONE.midnight.bot,
-    ];
-    for (const zy of zoneYs) {
-      bgLayer.visuals.segment('zone-div', { x: 0, y: zy }, { x: W, y: zy });
-    }
-
-    // Ocean surface line
-    bgLayer.visuals.segment('surface-line', { x: 0, y: Y_SURFACE }, { x: W, y: Y_SURFACE });
-
-    // ── Layer 1: primary productivity ──────────────────────────────
-    const prodLayer = canvas.layer('prod-');
-
-    // Green photic zone overlay
-    const prodPts = buildProdPoly();
-    prodLayer.visuals.polygon('zone', prodPts);
-
-    // Continental shelf bloom circles (varied sizes for visual depth)
-    const shelfBlooms = [
-      { x: 50,  r: 22, mid: false },
-      { x: 90,  r: 28, mid: false },
-      { x: 130, r: 24, mid: false },
-      { x: 165, r: 18, mid: false },
-      { x: 195, r: 12, mid: true  },
-    ];
-    for (const b of shelfBlooms) {
-      const cy = Y_SURFACE + 35;
-      const style = b.mid ? 'bloom-mid' : 'bloom';
-      prodLayer.visuals.circle(style,
-        { x: b.x, y: cy - b.r * 0.6 },
-        { x: b.x + b.r, y: cy },
-        { x: b.x, y: cy + b.r * 0.6 }
-      );
-    }
-
-    // Seamount bloom
-    const smBlooms = [
-      { x: 582, r: 16 },
-      { x: 610, r: 20 },
-      { x: 638, r: 14 },
-    ];
-    for (const b of smBlooms) {
-      const cy = Y_SURFACE + 38;
-      prodLayer.visuals.circle('bloom-mid',
-        { x: b.x, y: cy - b.r * 0.6 },
-        { x: b.x + b.r, y: cy },
-        { x: b.x, y: cy + b.r * 0.6 }
-      );
-    }
-
-    // Ridge bloom
-    const ridgeBlooms = [
-      { x: 800, r: 18 },
-      { x: 830, r: 22 },
-      { x: 858, r: 14 },
-    ];
-    for (const b of ridgeBlooms) {
-      const cy = Y_SURFACE + 36;
-      prodLayer.visuals.circle('bloom-mid',
-        { x: b.x, y: cy - b.r * 0.6 },
-        { x: b.x + b.r, y: cy },
-        { x: b.x, y: cy + b.r * 0.6 }
-      );
-    }
-
-    // ── Layer 2: geomorphology ──────────────────────────────────────
-    const geoLayer = canvas.layer('geo-');
-
-    // Land block (coast)
-    geoLayer.visuals.polygon('land', [
-      { x: 0,  y: Y_SURFACE },
-      { x: 15, y: Y_SURFACE },
-      { x: 15, y: depthToPixel(40) },
-      { x: 0,  y: depthToPixel(40) + 5 },
-    ]);
-
-    // Main seafloor polygon
-    const seafloorPts = buildSeafloorPoly();
-    geoLayer.visuals.polygon('seafloor', seafloorPts);
-
-    // Ridge highlight (top edge of ridge)
-    const ridgeHighlightPts = PROFILE.filter(p => p.x >= 720 && p.x <= 900 && p.d < 4000).map(p => ({
-      x: p.x, y: depthToPixel(p.d)
-    }));
-    if (ridgeHighlightPts.length >= 2) {
-      geoLayer.visuals.polyline('ridge-highlight', ridgeHighlightPts);
-    }
-
-    // Seamount highlight
-    const mountHighlightPts = PROFILE.filter(p => p.x >= 525 && p.x <= 720 && p.d < 4000).map(p => ({
-      x: p.x, y: depthToPixel(p.d)
-    }));
-    if (mountHighlightPts.length >= 2) {
-      geoLayer.visuals.polyline('ridge-highlight', mountHighlightPts);
-    }
-
-    // ── Layer 3: labels ─────────────────────────────────────────────
-    const lblLayer = canvas.layer('lbl-');
-
-    // Depth scale ruler (right edge)
-    const rulerX = W - 8;
-    lblLayer.visuals.segment('ruler-line', { x: rulerX, y: Y_SURFACE }, { x: rulerX, y: Y_SURFACE + ZONE.abyssal.bot });
-
-    const depthTicks = [200, 1000, 2000, 4000, 6000];
-    for (const d of depthTicks) {
-      const ty = depthToPixel(d);
-      if (ty < Y_SURFACE + ZONE.abyssal.bot) {
-        lblLayer.visuals.segment('ruler-tick', { x: rulerX - 6, y: ty }, { x: rulerX, y: ty });
-        lblLayer.text.labelAt(`${d}m`, { x: rulerX - 8, y: ty + 3 }, 'depth');
-      }
-    }
-
-    // Zone labels (left side)
-    const zoneLabels = [
-      { y: Y_SURFACE + ZONE.sunlit.bot  / 2,        text: ZONE.sunlit.label,   sub: ZONE.sunlit.depth },
-      { y: Y_SURFACE + ZONE.sunlit.bot  + (ZONE.twilight.bot - ZONE.sunlit.bot)  / 2, text: ZONE.twilight.label, sub: ZONE.twilight.depth },
-      { y: Y_SURFACE + ZONE.twilight.bot + (ZONE.midnight.bot - ZONE.twilight.bot) / 2, text: ZONE.midnight.label, sub: ZONE.midnight.depth },
-      { y: Y_SURFACE + ZONE.midnight.bot + (ZONE.abyssal.bot - ZONE.midnight.bot) / 2, text: ZONE.abyssal.label,  sub: ZONE.abyssal.depth },
-    ];
-    for (const zl of zoneLabels) {
-      lblLayer.text.labelAt(zl.text, { x: 22, y: zl.y - 4 }, 'zone');
-      lblLayer.text.labelAt(zl.sub,  { x: 22, y: zl.y + 8 }, 'depth');
-    }
-
-    // Geomorphology feature labels
-    const featureLabels = [
-      { x: 95,  y: depthToPixel(120) - 12, text: 'Continental Shelf' },
-      { x: 255, y: depthToPixel(700) - 12, text: 'Continental Slope' },
-      { x: 460, y: depthToPixel(4540) - 12, text: 'Abyssal Plain' },
-      { x: 610, y: depthToPixel(1000) - 14, text: 'Seamount' },
-      { x: 830, y: depthToPixel(1000) - 14, text: 'Mid-Ocean Ridge' },
-    ];
-    for (const fl of featureLabels) {
-      lblLayer.text.labelAt(fl.text, { x: fl.x, y: fl.y }, 'feature');
-    }
-
-    // ── Layer 4: interactive probe ──────────────────────────────────
-    const iLayer = canvas.layer('i-');
-
-    // Probe handle (surface, draggable left/right)
-    const probe = iLayer.handles.disk('probe-surface', { x: 450, y: Y_SURFACE });
-
-    // Sounding line top and bottom vertices
-    const soundTop    = iLayer.values.pin({ x: probe.x, y: Y_SURFACE });
-    const soundBottom = iLayer.values.pin({ x: probe.x, y: getFloorY(probe.x) });
-
-    // Sounding line segment
-    const soundLine = iLayer.visuals.segment('probe-line', soundTop, soundBottom);
-
-    // Floor marker dot
-    const floorDot = iLayer.visuals.point('probe-floor', soundBottom);
-
-    // Info box background
-    const infoBoxW = 152, infoBoxH = 82;
-    const infoBox = iLayer.visuals.box('info-bg',
-      { x: probe.x + 12, y: Y_SURFACE + 8 },
-      { x: probe.x + 12 + infoBoxW, y: Y_SURFACE + 8 + infoBoxH }
-    );
-
-    // Info text labels
-    const lblTitle   = iLayer.text.label('◈ PROBE',          'info-title');
-    const lblLocKey  = iLayer.text.label('dist:',            'info-key');
-    const lblLocVal  = iLayer.text.label('0 km',             'info-val');
-    const lblDepKey  = iLayer.text.label('depth:',           'info-key');
-    const lblDepVal  = iLayer.text.label('0 m',              'info-val');
-    const lblZoneKey = iLayer.text.label('zone:',            'info-key');
-    const lblZoneVal = iLayer.text.label('Sunlit',           'info-val-zone');
-    const lblProdKey = iLayer.text.label('productivity:',    'info-key');
-    const lblProdVal = iLayer.text.label('0.00',             'info-val-prod');
-
-    // Productivity bar (background + fill)
-    const prodBarBg   = iLayer.visuals.box('prod-bar-bg',   { x: 0, y: 0 }, { x: 80, y: 7 });
-    const prodBarFill = iLayer.visuals.box('prod-bar',      { x: 0, y: 0 }, { x: 0,  y: 7 });
-
-    // ── Reactive update ─────────────────────────────────────────────
-    Reactive.do([probe], () => {
-      // Clamp x within canvas, fix y to surface
-      const rawX = probe.x;
-      const cx   = Math.max(16, Math.min(W - 16, rawX));
-      probe.y    = Y_SURFACE;
-
-      const floorY  = getFloorY(cx);
-      const depth   = getFloorDepth(cx);
-      const zone    = zoneOf(depth);
-      const prod    = getProductivity(cx, depth);
-
-      // Update sounding line vertices
-      soundTop.x    = cx;
-      soundTop.y    = Y_SURFACE;
-      soundBottom.x = cx;
-      soundBottom.y = floorY;
-
-      // Position info box (keep within canvas)
-      const boxLeft = cx + 14 < W - infoBoxW - 10 ? cx + 14 : cx - infoBoxW - 14;
-      const boxTop  = Y_SURFACE + 8;
-
-      // Update info box position
-      const ibv0 = infoBox.at(0);
-      const ibv1 = infoBox.at(1);
-      ibv0.x = boxLeft;           ibv0.y = boxTop;
-      ibv1.x = boxLeft + infoBoxW; ibv1.y = boxTop + infoBoxH;
-
-      // Text positions inside box
-      const tx = boxLeft + 8;
-      lblTitle.x  = tx;       lblTitle.y  = boxTop + 12;
-
-      lblLocKey.x = tx;       lblLocKey.y = boxTop + 24;
-      lblLocVal.x = tx + 50;  lblLocVal.y = boxTop + 24;
-
-      lblDepKey.x = tx;       lblDepKey.y = boxTop + 35;
-      lblDepVal.x = tx + 50;  lblDepVal.y = boxTop + 35;
-
-      lblZoneKey.x = tx;       lblZoneKey.y = boxTop + 46;
-      lblZoneVal.x = tx + 50;  lblZoneVal.y = boxTop + 46;
-
-      lblProdKey.x = tx;       lblProdKey.y = boxTop + 57;
-      lblProdVal.x = tx + 50;  lblProdVal.y = boxTop + 57;
-
-      // Productivity bar
-      const barX = tx;
-      const barY = boxTop + 64;
-      const barW = infoBoxW - 16;
-      const barFW = Math.round(prod * barW);
-
-      const pbb0 = prodBarBg.at(0), pbb1 = prodBarBg.at(1);
-      pbb0.x = barX;       pbb0.y = barY;
-      pbb1.x = barX + barW; pbb1.y = barY + 6;
-
-      const pbf0 = prodBarFill.at(0), pbf1 = prodBarFill.at(1);
-      pbf0.x = barX;        pbf0.y = barY;
-      pbf1.x = barX + barFW; pbf1.y = barY + 6;
-
-      // Update text content
-      lblLocVal.value  = `${Math.round(cx / 3)} km`;
-      lblDepVal.value  = `${depth.toLocaleString()} m`;
-      lblZoneVal.value = zone;
-      lblProdVal.value = prod > 0 ? `${Math.round(prod * 100)}%` : '0%';
-    }, true);
 
   })();
   </script>
